@@ -288,7 +288,7 @@ int GameWorld::EntityIndex(lua_State* L) {
             lua_pushnumber(L, static_cast<float>(EntityList[id]->transform.origin.y));
             return 1;
         }
-        case 57140599681: { // trasnform_direction
+        case 57142990116: { // trasnform_direction
             lua_pushinteger(L, static_cast<int>(EntityList[id]->transform.currentDirection));
             return 1;
         }
@@ -434,7 +434,7 @@ int GameWorld::EntityNewIndex(lua_State* L) {
             EntityList[id]->Rendered = false;
             return 0;
         }
-        case 57140599681: { // transform_direction
+        case 57142990116: { // transform_direction
             EntityList[id]->transform.currentDirection = static_cast<int>(lua_tonumber(L, 3));
             return 0;
         }
