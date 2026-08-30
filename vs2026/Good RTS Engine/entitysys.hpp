@@ -42,7 +42,6 @@ struct eLogic{
 	double nexttime = 0.0;
 	double nexttimeSaw = 0.0;
 	double nexttimeAttack = 0.0;
-	double attackDuration = 0.0;
 	float moveSpeed = 50.0f;
 	bool moving = false;
 	u64 targetpos = 0;
