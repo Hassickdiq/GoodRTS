@@ -308,10 +308,6 @@ int GameWorld::EntityIndex(lua_State* L) {
             lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.nexttimeAttack));
             return 1;
         }
-        case 58094014729: { // logic_attackDuration
-            lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.nexttimeAttack));
-            return 1;
-        }
         case 27108634609: { // logic_hitPoint
             lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.hitPoint));
             return 1;
@@ -452,10 +448,6 @@ int GameWorld::EntityNewIndex(lua_State* L) {
         }
         case 58923193081: { // logic_nexttimeAttack
             EntityList[id]->logic.nexttimeAttack = static_cast<float>(lua_tonumber(L, 3));
-            return 0;
-        }
-        case 58094014729: { // logic_attackDuration
-            EntityList[id]->logic.attackDuration = static_cast<float>(lua_tonumber(L, 3));
             return 0;
         }
         case 27573930916: { // logic_minDamage
