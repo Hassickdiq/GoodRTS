@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strateji Harita Editörü</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #2d2d2d; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        canvas {
+            background-color: #000;
+            cursor: crosshair;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+        }
+
+        .btn { transition: all 0.2s ease; }
+        .btn.active { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); }
+        
+        .delete-btn {
+            position: absolute; top: -6px; right: -6px; background: #ef4444; color: white;
+            border-radius: 50%; width: 18px; height: 18px; font-size: 10px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; border: 2px solid #27272a; opacity: 0; transition: opacity 0.2s;
+        }
+        .btn:hover .delete-btn { opacity: 1; }
+        
+        .textarea-code { font-family: monospace; white-space: pre; overflow-wrap: normal; overflow-x: scroll; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <nav class="bg-zinc-900 border-b border-zinc-700 p-4 shadow-md flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
+            Taktiksel Harita Editörü (AoE Yükselti Sistemi)
+        </h1>
+        <div class="flex gap-4">
+            <button onclick="exportData()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-semibold text-sm shadow">
+                Kodu Üret (Export)
+            </button>
+            <button onclick="importData()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded font-semibold text-sm shadow">
+                Kodu Yükle (Import)
+            </button>
+        </div>
+    </nav>
+
+    <div class="flex flex-1 overflow-hidden">
+        <aside class="w-80 bg-zinc-800 border-r border-zinc-700 p-4 flex flex-col gap-6 overflow-y-auto">
+            
+            <div>
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Harita Ayarları</h2>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                        <label class="text-xs text-zinc-400 block mb-1">Harita Boyutu</label>
+                        <input type="number" id="mapSize" value="20" class="w-full bg-zinc-900 border border-zinc-600 rounded p-1.5 text-sm" onchange="resizeMap()">
+                    </div>
+                    <div>
+                        <label class="text-xs text-zinc-400 block mb-1">Local Player ID</label>
+                        <input type="number" id="localPlr" value="1" class="w-full bg-zinc-900 border border-zinc-600 rounded p-1.5 text-sm" onchange="updateSettings()">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Araç Modu</h2>
+                <div class="flex bg-zinc-900 rounded p-1 border border-zinc-700 mb-3">
+                    <button id="mode-tiles" onclick="setMode('tiles')" class="flex-1 text-sm py-1.5 rounded bg-zinc-700 text-white font-semibold transition-colors">Zemin</button>
+                    <button id="mode-elevation" onclick="setMode('elevation')" class="flex-1 text-sm py-1.5 rounded text-zinc-400 hover:text-white font-semibold transition-colors">Yükselti</button>
+                    <button id="mode-entities" onclick="setMode('entities')" class="flex-1 text-sm py-1.5 rounded text-zinc-400 hover:text-white font-semibold transition-colors">Birimler</button>
+                </div>
+
+                <div id="brush-size-container" class="mb-2">
+                    <div class="flex justify-between text-xs text-zinc-400 mb-1 font-bold">
+                        <label>Fırça Boyutu</label>
+                        <span id="brushSizeVal">1</span>
+                    </div>
+                    <input type="range" id="brushSize" min="1" max="5" value="1" class="w-full cursor-pointer accent-blue-500" oninput="updateBrushSize(this.value)">
+                </div>
+            </div>
+
+            <!-- TILE PANEL -->
+            <div id="panel-tiles">
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Zemin Fırçası</h2>
+                <div class="grid grid-cols-2 gap-2" id="tile-list">
+                    <button onclick="setTileType('sand')" id="tile-sand" class="btn active border border-zinc-600 rounded p-2 flex flex-col items-center gap-1">
+                        <div class="w-8 h-8 rounded" style="background-color: #dcb77c;"></div>
+                        <span class="text-xs">Sand</span>
+                    </button>
+                    <button onclick="setTileType('grass')" id="tile-grass" class="btn border border-zinc-600 rounded p-2 flex flex-col items-center gap-1">
+                        <div class="w-8 h-8 rounded" style="background-color: #6ca952;"></div>
+                        <span class="text-xs">Grass</span>
+                    </button>
+                </div>
+                
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3 mt-5">Özel Zemin Ekle</h2>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="custom-tile-name" placeholder="Örn: dirt" class="flex-1 w-full bg-zinc-900 border border-zinc-600 rounded p-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                    <button onclick="addCustomTile()" class="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded text-xs font-semibold transition-colors">Ekle</button>
+                </div>
+            </div>
+
+            <!-- ELEVATION PANEL -->
+            <div id="panel-elevation" class="hidden">
+                <p class="text-xs text-zinc-500 mb-4 bg-zinc-900/50 p-2 rounded border border-zinc-700/50">
+                    <b>Yükselti Modu:</b> Tepe kurduğunuzda yakın iki yüksek nokta arasındaki boşluklar otomatik olarak en yüksek seviyeye eşitlenir (Plato efekti).
+                </p>
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Yükselti (Elevation) Seviyesi</h2>
+                <div class="grid grid-cols-4 gap-2 mb-4" id="elevation-list"></div>
+            </div>
+
+            <!-- ENTITIES PANEL -->
+            <div id="panel-entities" class="hidden">
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Takım Seçimi (1-9)</h2>
+                <div class="grid grid-cols-3 gap-1.5 mb-4" id="team-grid">
+                    <button onclick="setTeam(1)" id="team-1" class="btn active border rounded py-1 text-xs font-bold text-white shadow-sm" style="background-color: rgba(59, 130, 246, 0.2); border-color: #3b82f6;">T1</button>
+                    <button onclick="setTeam(2)" id="team-2" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #ef4444;">T2</button>
+                    <button onclick="setTeam(3)" id="team-3" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #22c55e;">T3</button>
+                    <button onclick="setTeam(4)" id="team-4" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #eab308;">T4</button>
+                    <button onclick="setTeam(5)" id="team-5" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #a855f7;">T5</button>
+                    <button onclick="setTeam(6)" id="team-6" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #06b6d4;">T6</button>
+                    <button onclick="setTeam(7)" id="team-7" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #f97316;">T7</button>
+                    <button onclick="setTeam(8)" id="team-8" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #ec4899;">T8</button>
+                    <button onclick="setTeam(9)" id="team-9" class="btn border border-zinc-600 rounded py-1 text-xs font-bold text-white shadow-sm" style="color: #94a3b8;">T9</button>
+                </div>
+
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3">Birim Listesi</h2>
+                <div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1" id="entity-list">
+                    <button onclick="setEntityType('Legion')" id="ent-Legion" class="btn active border border-zinc-600 rounded px-3 py-2 flex justify-between items-center group relative overflow-hidden bg-zinc-800/50">
+                        <span class="text-sm font-semibold text-zinc-200">Legion</span>
+                        <div class="w-5 h-5 flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="-7 -7 14 14" class="text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="-5" y="-5" width="10" height="10"/></svg>
+                        </div>
+                    </button>
+                    <button onclick="setEntityType('Ballista')" id="ent-Ballista" class="btn border border-zinc-600 rounded px-3 py-2 flex justify-between items-center group relative overflow-hidden bg-zinc-800/50">
+                        <span class="text-sm font-semibold text-zinc-200">Ballista</span>
+                        <div class="w-5 h-5 flex items-center justify-center">
+                            <svg width="14" height="14" viewBox="-7 -7 14 14" class="text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="0" cy="0" r="5"/></svg>
+                        </div>
+                    </button>
+                </div>
+
+                <h2 class="text-xs uppercase tracking-wider text-zinc-400 font-bold mb-3 mt-5">Özel Birim Ekle</h2>
+                <div class="flex flex-col gap-2 mb-2 bg-zinc-900/50 p-2 rounded border border-zinc-700/50">
+                    <input type="text" id="custom-entity-name" placeholder="Birim Adı (Örn: Archer)" class="w-full bg-zinc-900 border border-zinc-600 rounded p-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                    
+                    <div class="flex items-center justify-between">
+                        <select id="custom-entity-shape" class="bg-zinc-900 border border-zinc-600 rounded p-1 text-xs text-zinc-300 focus:outline-none focus:border-blue-500">
+                            <option value="box">Kutu</option>
+                            <option value="cylinder">Silindir</option>
+                            <option value="pyramid">Piramit</option>
+                            <option value="diamond">Elmas</option>
+                            <option value="triangle">Üçgen</option>
+                            <option value="star">Yıldız</option>
+                            <option value="cross">Haç</option>
+                        </select>
+                        <button onclick="addCustomEntity()" class="bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1 rounded text-xs font-semibold transition-colors">Ekle</button>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex items-center gap-2 p-2 bg-zinc-900 border border-zinc-700 rounded">
+                    <input type="checkbox" id="snap-grid-cb" onchange="state.snapToGrid = this.checked" class="w-4 h-4 text-blue-600 bg-zinc-800 border-zinc-600 rounded cursor-pointer">
+                    <label for="snap-grid-cb" class="text-xs text-zinc-300 font-semibold cursor-pointer select-none">Izgaraya Eşitle (Snap to Grid)</label>
+                </div>
+            </div>
+        </aside>
+
+        <main id="canvasContainer" class="flex-1 bg-zinc-950 p-0 flex flex-col items-center justify-center relative overflow-hidden">
+            <canvas id="mapCanvas" class="w-full h-full"></canvas>
+            <div id="coordTooltip" class="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none hidden font-mono z-10">
+                X: 0.0, Y: 0.0
+            </div>
+        </main>
+
+        <aside class="w-96 bg-zinc-900 border-l border-zinc-700 flex flex-col">
+            <div class="p-3 border-b border-zinc-700 bg-zinc-800 flex justify-between items-center">
+                <h2 class="text-sm font-bold text-zinc-300">Veri İçe/Dışa Aktar</h2>
+                <button onclick="copyToClipboard()" class="text-xs bg-zinc-700 hover:bg-zinc-600 px-2 py-1 rounded text-white transition-colors" title="Kopyala">
+                    Kopyala
+                </button>
+            </div>
+            <textarea id="ioData" class="flex-1 w-full bg-zinc-950 text-emerald-400 p-4 text-sm textarea-code focus:outline-none resize-none" spellcheck="false" placeholder="Harita verisi buraya üretilecek..."></textarea>
+        </aside>
+    </div>
+
+    <script>
+        const state = {
+            width: 20, height: 20, localPlr: 1, brushSize: 1,
+            tiles: [], entities: [], 
+            mode: 'tiles', currentTile: 'sand', currentElev: 0,
+            currentEntity: 'Legion', currentTeam: 1, isDrawing: false,
+            isPanning: false, panStartX: 0, panStartY: 0, camera: { x: 0, y: 0 }, panned: false,
+            hoverCol: -1, hoverRow: -1, hoveredEntity: null, dragState: { active: false, entity: null },
+            worldUnitsPerTile: 40, tileW: 64, tileH: 32, snapToGrid: false
+        };
+
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const coordTooltip = document.getElementById('coordTooltip');
+        const ioTextarea = document.getElementById('ioData');
+
+        const colors = {
+            tiles: { sand: '#dcb77c', grass: '#6ca952' },
+            teams: {
+                1: '#3b82f6', 2: '#ef4444', 3: '#22c55e', 4: '#eab308', 5: '#a855f7',
+                6: '#06b6d4', 7: '#f97316', 8: '#ec4899', 9: '#94a3b8'
+            }
+        };
+
+        const entityShapes = { 'Legion': 'box', 'Ballista': 'cylinder' };
+        
+        // Şekilleri SVG ikonları olarak döndüren yardımcı fonksiyon
+        function getShapeIconSVG(shape) {
+            switch(shape) {
+                case 'box': return `<rect x="-5" y="-5" width="10" height="10"/>`;
+                case 'cylinder': return `<circle cx="0" cy="0" r="5"/>`;
+                case 'pyramid': return `<polygon points="0,-6 -5,4 5,4"/>`;
+                case 'diamond': return `<polygon points="0,-6 5,0 0,6 -5,0"/>`;
+                case 'triangle': return `<polygon points="-5,-4 5,-4 0,5"/>`;
+                case 'star': return `<polygon points="0,-6 1.5,-2 6,-2 2.5,1 4,5.5 0,3.5 -4,5.5 -2.5,1 -6,-2 -1.5,-2"/>`;
+                case 'cross': return `<polygon points="-2,-6 2,-6 2,-2 6,-2 6,2 2,2 2,6 -2,6 -2,2 -6,2 -6,-2 -2,-2"/>`;
+                default: return `<rect x="-4" y="-4" width="8" height="8"/>`;
+            }
+        }
+
+        function initElevationButtons() {
+            const list = document.getElementById('elevation-list');
+            for(let i=0; i<=7; i++) {
+                const btn = document.createElement('button');
+                btn.id = 'elev-' + i;
+                btn.className = `btn ${i===0 ? 'active border-blue-500 bg-blue-500/20 text-white' : 'border-zinc-600 text-zinc-400'} border rounded py-2 text-sm font-bold hover:text-white transition-colors`;
+                btn.innerText = i;
+                btn.onclick = () => setElevationBrush(i);
+                list.appendChild(btn);
+            }
+        }
+
+        function setMode(mode) {
+            state.mode = mode;
+            ['tiles', 'elevation', 'entities'].forEach(m => {
+                const btn = document.getElementById('mode-' + m);
+                if (btn) {
+                    btn.className = mode === m 
+                        ? 'flex-1 text-sm py-1.5 rounded bg-zinc-700 text-white font-semibold transition-colors'
+                        : 'flex-1 text-sm py-1.5 rounded text-zinc-400 hover:text-white font-semibold transition-colors';
+                }
+                const panel = document.getElementById('panel-' + m);
+                if (panel) panel.style.display = mode === m ? 'block' : 'none';
+            });
+
+            const brushContainer = document.getElementById('brush-size-container');
+            if(brushContainer) brushContainer.style.display = (mode === 'entities') ? 'none' : 'block';
+        }
+
+        function updateBrushSize(val) {
+            document.getElementById('brushSizeVal').innerText = val;
+            state.brushSize = parseInt(val);
+            render();
+        }
+
+        function setTileType(type) {
+            state.currentTile = type;
+            document.querySelectorAll('#panel-tiles .btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('tile-' + type);
+            if(btn) btn.classList.add('active');
+        }
+
+        function setElevationBrush(elev) {
+            state.currentElev = elev;
+            document.querySelectorAll('#elevation-list .btn').forEach(b => {
+                b.className = 'btn border border-zinc-600 text-zinc-400 rounded py-2 text-sm font-bold hover:text-white transition-colors';
+            });
+            const btn = document.getElementById('elev-' + elev);
+            if(btn) btn.className = 'btn active border border-blue-500 bg-blue-500/20 text-white rounded py-2 text-sm font-bold transition-colors';
+        }
+
+        function removeTileType(e, type) {
+            e.stopPropagation(); 
+            const btn = document.getElementById('tile-' + type);
+            if(btn) btn.remove();
+            if(state.currentTile === type) setTileType('sand'); 
+        }
+
+        function addCustomTile(predefinedName = null) {
+            const input = document.getElementById('custom-tile-name');
+            const name = predefinedName || (input ? input.value.trim() : '');
+            if (!name) return;
+            if (document.getElementById('tile-' + name)) { setTileType(name); if(input) input.value = ''; return; }
+            const color = `hsl(${Math.floor(Math.random() * 360)}, 40%, 45%)`;
+            colors.tiles[name] = color;
+            const btnHTML = `<button onclick="setTileType('${name}')" id="tile-${name}" class="btn relative border border-zinc-600 rounded p-2 flex flex-col items-center gap-1"><span class="delete-btn" onclick="removeTileType(event, '${name}')">✕</span><div class="w-8 h-8 rounded" style="background-color: ${color};"></div><span class="text-xs truncate w-full text-center" title="${name}">${name}</span></button>`;
+            document.getElementById('tile-list').insertAdjacentHTML('beforeend', btnHTML);
+            setTileType(name);
+            if(input) input.value = '';
+        }
+
+        function setEntityType(type) {
+            state.currentEntity = type;
+            document.querySelectorAll('#entity-list .btn').forEach(b => b.classList.remove('active'));
+            const btn = document.getElementById('ent-' + type);
+            if(btn) btn.classList.add('active');
+        }
+
+        function removeEntityType(e, type) {
+            e.stopPropagation(); 
+            const btn = document.getElementById('ent-' + type);
+            if(btn) btn.remove();
+            if(state.currentEntity === type) {
+                // If there are still entities left, select the first one, otherwise null
+                const firstEntBtn = document.querySelector('#entity-list .btn');
+                if (firstEntBtn) {
+                    const firstType = firstEntBtn.id.replace('ent-', '');
+                    setEntityType(firstType);
+                } else {
+                    state.currentEntity = null;
+                }
+            } 
+        }
+
+        function addCustomEntity(predefinedName = null, predefinedShape = null) {
+            const nameInput = document.getElementById('custom-entity-name');
+            const shapeSelect = document.getElementById('custom-entity-shape');
+            
+            const name = predefinedName || (nameInput ? nameInput.value.trim() : '');
+            if (!name) return;
+            if (document.getElementById('ent-' + name)) { setEntityType(name); if(nameInput) nameInput.value = ''; return; }
+            
+            // Kullanıcının seçtiği şekli al, yoksa varsayılan veya rastgele ata
+            const shape = predefinedShape || (shapeSelect ? shapeSelect.value : 'box');
+            entityShapes[name] = shape;
+            
+            const svgIcon = getShapeIconSVG(shape);
+            
+            const btnHTML = `
+                <button onclick="setEntityType('${name}')" id="ent-${name}" class="btn relative border border-zinc-600 rounded px-3 py-2 flex justify-between items-center group overflow-hidden bg-zinc-800/50">
+                    <span class="delete-btn" onclick="removeEntityType(event, '${name}')" style="top: -2px; right: -2px;">✕</span>
+                    <span class="text-sm font-semibold text-zinc-200 truncate pr-2" title="${name}">${name}</span>
+                    <div class="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+                        <svg width="14" height="14" viewBox="-7 -7 14 14" class="text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.5">${svgIcon}</svg>
+                    </div>
+                </button>
+            `;
+            
+            document.getElementById('entity-list').insertAdjacentHTML('beforeend', btnHTML);
+            setEntityType(name);
+            if(nameInput) nameInput.value = '';
+        }
+
+        function setTeam(teamId) {
+            state.currentTeam = teamId;
+            for(let i = 1; i <= 9; i++) {
+                const btn = document.getElementById('team-' + i);
+                if(btn) {
+                    btn.classList.remove('active'); btn.style.backgroundColor = 'transparent';
+                    btn.style.borderColor = '#52525b'; btn.style.color = colors.teams[i]; 
+                }
+            }
+            const selectedBtn = document.getElementById('team-' + teamId);
+            if(selectedBtn) {
+                selectedBtn.classList.add('active');
+                selectedBtn.style.backgroundColor = colors.teams[teamId] + '33';
+                selectedBtn.style.borderColor = colors.teams[teamId];
+                selectedBtn.style.color = '#fff';
+            }
+        }
+
+        function updateSettings() { state.localPlr = parseInt(document.getElementById('localPlr').value) || 1; }
+
+        function screenToWorld(sx, sy) { return { x: sx - state.camera.x, y: sy - state.camera.y }; }
+        function worldToScreen(wx, wy) { return { sx: wx + state.camera.x, sy: wy + state.camera.y }; }
+        
+        function mathGrid(col, row) {
+            return {
+                x: (col - row) * (state.tileW / 2),
+                y: (col + row) * (state.tileH / 2)
+            };
+        }
+
+        function gridToWorld(col, row) { return mathGrid(col, row); }
+        function gridToScreen(col, row) { const { x, y } = gridToWorld(col, row); return worldToScreen(x, y); }
+        
+        function worldToGridFloat(wx, wy) {
+            const X = wx / (state.tileW / 2), Y = wy / (state.tileH / 2);
+            return { col: (Y + X) / 2, row: (Y - X) / 2 };
+        }
+        function screenToGrid(sx, sy) {
+            const w = screenToWorld(sx, sy);
+            const floatCoord = worldToGridFloat(w.x, w.y);
+            return { col: Math.floor(floatCoord.col), row: Math.floor(floatCoord.row) };
+        }
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            if(container) {
+                canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+                if (!state.panned) { state.camera.x = canvas.width / 2; state.camera.y = 100; }
+                render();
+            }
+        }
+
+        function initMap() {
+            state.tiles = [];
+            for (let i = 0; i < state.width * state.height; i++) 
+                state.tiles.push({ type: 'sand', v1: Math.floor(Math.random() * 9), v2: 0 }); // Başlangıçta 0-8 varyasyonu
+            state.entities = [];
+            resizeCanvas();
+        }
+
+        function resizeMap() {
+            const newSize = parseInt(document.getElementById('mapSize').value) || 20;
+            const newTiles = [];
+            for (let r = 0; r < newSize; r++) {
+                for (let c = 0; c < newSize; c++) {
+                    if (c < state.width && r < state.height) 
+                        newTiles.push(state.tiles[r * state.width + c]);
+                    else 
+                        newTiles.push({ type: 'sand', v1: Math.floor(Math.random() * 9), v2: 0 });
+                }
+            }
+            state.width = newSize; state.height = newSize; state.tiles = newTiles;
+            updateAllFrames();
+            resizeCanvas();
+        }
+
+        function getElev(c, r) {
+            if(c < 0 || c >= state.width || r < 0 || r >= state.height) return 0;
+            return state.tiles[r * state.width + c].v2;
+        }
+
+        function getCornerHeights(c, r) {
+            const nH = Math.max(getElev(c, r), getElev(c, r-1), getElev(c-1, r-1), getElev(c-1, r));
+            const eH = Math.max(getElev(c, r), getElev(c+1, r), getElev(c+1, r-1), getElev(c, r-1));
+            const sH = Math.max(getElev(c, r), getElev(c+1, r), getElev(c+1, r+1), getElev(c, r+1));
+            const wH = Math.max(getElev(c, r), getElev(c-1, r), getElev(c-1, r+1), getElev(c, r+1));
+            return { nH, eH, sH, wH };
+        }
+
+        // Tüm harita için akıllı komşuluk dolgusu / Plato Doldurma
+        function applyCascade() {
+            let changed = true;
+            let iter = 0;
+            // 1. Kademe Yayılımı (Eğimli Dağ Kenarları)
+            while (changed && iter < 10) {
+                changed = false;
+                for (let r = 0; r < state.height; r++) {
+                    for (let c = 0; c < state.width; c++) {
+                        let maxNeighbor = 0;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                maxNeighbor = Math.max(maxNeighbor, getElev(c + dx, r + dy));
+                            }
+                        }
+                        let currentIdx = r * state.width + c;
+                        if (maxNeighbor > 0 && state.tiles[currentIdx].v2 < maxNeighbor - 1) {
+                            state.tiles[currentIdx].v2 = maxNeighbor - 1;
+                            changed = true;
+                        }
+                    }
+                }
+                iter++;
+            }
+
+            // 2. Plato / Boşluk Doldurma (Tepe arası düzlük)
+            for (let r = 0; r < state.height; r++) {
+                for (let c = 0; c < state.width; c++) {
+                    let currentIdx = r * state.width + c;
+                    let currentElev = state.tiles[currentIdx].v2;
+                    
+                    if (currentElev === 0) {
+                        let leftElev = getElev(c - 1, r);
+                        let rightElev = getElev(c + 1, r);
+                        if (leftElev > 0 && leftElev === rightElev) {
+                            state.tiles[currentIdx].v2 = leftElev;
+                        }
+                        
+                        let topElev = getElev(c, r - 1);
+                        let bottomElev = getElev(c, r + 1);
+                        if (topElev > 0 && topElev === bottomElev) {
+                            state.tiles[currentIdx].v2 = topElev;
+                        }
+                    }
+                }
+            }
+            updateAllFrames();
+        }
+
+        function updateAllFrames() {
+            for (let r = 0; r < state.height; r++) {
+                for (let c = 0; c < state.width; c++) {
+                    const corners = getCornerHeights(c, r);
+                    const minH = Math.min(corners.nH, corners.eH, corners.sH, corners.wH);
+                    
+                    const dN = corners.nH > minH ? 1 : 0;
+                    const dE = corners.eH > minH ? 1 : 0;
+                    const dS = corners.sH > minH ? 1 : 0;
+                    const dW = corners.wH > minH ? 1 : 0;
+                    
+                    const mask = (dN << 3) | (dE << 2) | (dS << 1) | dW;
+                    
+                    const frameMap = {
+                        0: -1,
+                        8: 10,  // Üst (Kuzey) Köşe
+                        4: 12,  // Sağ (Doğu) Köşe
+                        2: 9,  // Alt (Güney) Köşe
+                        1: 11,  // Sol (Batı) Köşe
+                        12: 16, // Sağ-Üst Kenar
+                        6: 15,  // Sağ-Alt Kenar
+                        3: 13,  // Sol-Alt Kenar
+                        9: 14,  // Sol-Üst Kenar
+                        10: 1, 5: 1,
+                        14: 23, 13: 22, 11: 24, 7: 14
+                    };
+                    
+                    let targetFrame = frameMap[mask];
+                    if (targetFrame === undefined) targetFrame = 1;
+                    
+                    let idx = r * state.width + c;
+
+                    if (targetFrame === -1) {
+                        // Zemin düz ve frame henüz 0-8 arasında değilse rastgele değer ver.
+                        // Zaten 0-8 arasında bir flat varyasyonu varsa, buna dokunma!
+                        let currentV1 = state.tiles[idx].v1;
+                        if (currentV1 >= 0 && currentV1 <= 8) {
+                            // Mevcut rastgele düz frame korunuyor
+                        } else {
+                            state.tiles[idx].v1 = Math.floor(Math.random() * 9); // 0-8 arası rastgele atama
+                        }
+                    } else {
+                        // Eğer eğimli bir tile ise rampa frame'ini zorunlu ayarla
+                        state.tiles[idx].v1 = targetFrame;
+                    }
+                }
+            }
+        }
+
+        function drawTileMesh(ctx, cx, cy, color, c, r, isHover = false) {
+            const corners = getCornerHeights(c, r);
+            const tile = state.tiles[r * state.width + c];
+            
+            const top_x = cx;
+            const top_y = cy - (corners.nH * 16);
+            
+            const right_x = cx + state.tileW / 2;
+            const right_y = cy + state.tileH / 2 - (corners.eH * 16);
+            
+            const bottom_x = cx;
+            const bottom_y = cy + state.tileH - (corners.sH * 16);
+            
+            const left_x = cx - state.tileW / 2;
+            const left_y = cy + state.tileH / 2 - (corners.wH * 16);
+            
+            if (!isHover && Math.max(corners.nH, corners.eH, corners.sH, corners.wH) > 0) {
+                const base_bottom_y = cy + state.tileH;
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(left_x, left_y);
+                ctx.lineTo(bottom_x, bottom_y);
+                ctx.lineTo(bottom_x, base_bottom_y);
+                ctx.lineTo(left_x, cy + state.tileH / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(bottom_x, bottom_y);
+                ctx.lineTo(right_x, right_y);
+                ctx.lineTo(right_x, cy + state.tileH / 2);
+                ctx.lineTo(bottom_x, base_bottom_y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = color;
+            ctx.strokeStyle = isHover ? '#fff' : 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = isHover ? 2 : 1;
+            
+            ctx.beginPath();
+            ctx.moveTo(top_x, top_y);
+            ctx.lineTo(right_x, right_y);
+            ctx.lineTo(bottom_x, bottom_y);
+            ctx.lineTo(left_x, left_y);
+            ctx.closePath();
+            
+            if(!isHover) ctx.fill();
+            ctx.stroke();
+            
+            if(isHover) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fill();
+            }
+
+            if (!isHover) {
+                const mid_y = (top_y + bottom_y) / 2;
+                ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`f:${tile.v1}`, cx, mid_y);
+            }
+        }
+
+        function render() {
+            if(!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let r = 0; r < state.height; r++) {
+                for (let c = 0; c < state.width; c++) {
+                    const tile = state.tiles[r * state.width + c];
+                    const { sx, sy } = gridToScreen(c, r);
+                    drawTileMesh(ctx, sx, sy, colors.tiles[tile.type] || '#000', c, r);
+                }
+            }
+
+            // Brush boyutu ile birlikte fare önizlemesini çiz
+            if (state.hoverCol >= 0 && state.hoverCol < state.width && state.hoverRow >= 0 && state.hoverRow < state.height) {
+                if (state.mode === 'tiles' || state.mode === 'elevation') {
+                    const size = state.brushSize || 1;
+                    const offset = Math.floor(size / 2);
+                    for (let r = -offset; r < size - offset; r++) {
+                        for (let c = -offset; c < size - offset; c++) {
+                            const targetCol = state.hoverCol + c;
+                            const targetRow = state.hoverRow + r;
+                            if (targetCol >= 0 && targetCol < state.width && targetRow >= 0 && targetRow < state.height) {
+                                const { sx, sy } = gridToScreen(targetCol, targetRow);
+                                drawTileMesh(ctx, sx, sy, 'transparent', targetCol, targetRow, true);
+                            }
+                        }
+                    }
+                } else {
+                    const { sx, sy } = gridToScreen(state.hoverCol, state.hoverRow);
+                    drawTileMesh(ctx, sx, sy, 'transparent', state.hoverCol, state.hoverRow, true);
+                }
+            }
+
+            const sortedEntities = [...state.entities].sort((a, b) => a.y - b.y);
+
+            for (const ent of sortedEntities) {
+                const { sx, sy } = worldToScreen(ent.x, ent.y);
+                const entColor = colors.teams[ent.team] || '#fff';
+                const isHovered = (state.hoveredEntity === ent);
+                
+                ctx.save(); ctx.translate(sx, sy);
+                
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.beginPath(); ctx.ellipse(0, 0, 16, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+                ctx.fillStyle = entColor; ctx.strokeStyle = isHovered ? '#fff' : '#000';
+                ctx.lineWidth = isHovered ? 2 : 1.5;
+                
+                const shape = entityShapes[ent.type] || 'box';
+                const bw = 16, bh = 20;
+                
+                // Draw based on selected shape
+                if (shape === 'box') {
+                    ctx.beginPath(); ctx.rect(-bw/2, -bh/2, bw, bh); ctx.fill(); ctx.stroke();
+                } else if (shape === 'cylinder') {
+                    ctx.beginPath(); ctx.ellipse(0, -bh/4, bw/2, bh/2, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                } else if (shape === 'pyramid') {
+                    ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(-bw/2, bh/4); ctx.lineTo(bw/2, bh/4); ctx.closePath(); ctx.fill(); ctx.stroke();
+                } else if (shape === 'diamond') {
+                    ctx.beginPath(); ctx.moveTo(0, -bh/2); ctx.lineTo(bw/2, 0); ctx.lineTo(0, bh/2); ctx.lineTo(-bw/2, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+                } else if (shape === 'triangle') {
+                    ctx.beginPath(); ctx.moveTo(0, bh/3); ctx.lineTo(-bw/2, -bh/2); ctx.lineTo(bw/2, -bh/2); ctx.closePath(); ctx.fill(); ctx.stroke();
+                } else if (shape === 'star') {
+                    // Simple 5-point star
+                    ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*bw/1.5, -Math.sin((18+i*72)/180*Math.PI)*bh/1.5);
+                        ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*bw/3, -Math.sin((54+i*72)/180*Math.PI)*bh/3);
+                    }
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                } else if (shape === 'cross') {
+                    ctx.beginPath(); 
+                    const t = bw/4;
+                    ctx.moveTo(-t, -bh/2); ctx.lineTo(t, -bh/2); ctx.lineTo(t, -t); 
+                    ctx.lineTo(bw/2, -t); ctx.lineTo(bw/2, t); ctx.lineTo(t, t);
+                    ctx.lineTo(t, bh/2); ctx.lineTo(-t, bh/2); ctx.lineTo(-t, t);
+                    ctx.lineTo(-bw/2, t); ctx.lineTo(-bw/2, -t); ctx.lineTo(-t, -t);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            if (state.hoveredEntity) {
+                const { sx, sy } = worldToScreen(state.hoveredEntity.x, state.hoveredEntity.y);
+                const text = `${state.hoveredEntity.type} (T${state.hoveredEntity.team})`;
+                ctx.font = '600 12px Inter, sans-serif'; const textWidth = ctx.measureText(text).width;
+                const padding = 6; ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.strokeStyle = colors.teams[state.hoveredEntity.team] || '#fff'; ctx.lineWidth = 1;
+                const boxX = sx - textWidth/2 - padding, boxY = sy - 45;
+                ctx.beginPath(); ctx.roundRect(boxX, boxY, textWidth + padding*2, 20, 4); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, sx, boxY + 10);
+            }
+        }
+
+        function getMousePos(e) { const rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            
+            if (e.button === 1 || (e.button === 0 && e.altKey)) {
+                e.preventDefault(); state.isPanning = true; state.panned = true;
+                state.panStartX = pos.x - state.camera.x; state.panStartY = pos.y - state.camera.y;
+                canvas.style.cursor = 'grabbing'; return;
+            }
+            
+            if (e.button === 2 && state.mode === 'entities') {
+                const worldPos = screenToWorld(pos.x, pos.y);
+                let closestIdx = -1; let closestDist = Infinity;
+                state.entities.forEach((ent, idx) => {
+                    const dx = ent.x - worldPos.x; const dy = ent.y - worldPos.y;
+                    const distSq = dx*dx + dy*dy; if(distSq < closestDist) { closestDist = distSq; closestIdx = idx; }
+                });
+                if (closestIdx !== -1 && closestDist < 1600) { state.entities.splice(closestIdx, 1); render(); }
+                return;
+            }
+            
+            if (e.button !== 0) return;
+            
+            if (state.mode === 'entities' && state.hoveredEntity) {
+                state.dragState.active = true; state.dragState.entity = state.hoveredEntity; return;
+            }
+
+            state.isDrawing = true; interactWithMap(pos);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(e);
+            
+            if (state.isPanning) { state.camera.x = pos.x - state.panStartX; state.camera.y = pos.y - state.panStartY; render(); return; }
+            
+            const worldPos = screenToWorld(pos.x, pos.y);
+            const gridPos = screenToGrid(pos.x, pos.y);
+
+            if (state.dragState.active && state.dragState.entity) {
+                if (state.snapToGrid) {
+                    const snapPos = mathGrid(gridPos.col, gridPos.row);
+                    state.dragState.entity.x = snapPos.x;
+                    state.dragState.entity.y = snapPos.y;
+                } else {
+                    const snap = 10; 
+                    state.dragState.entity.x = Math.round(worldPos.x / snap) * snap; 
+                    state.dragState.entity.y = Math.round(worldPos.y / snap) * snap;
+                }
+                render(); return; 
+            }
+            
+            state.hoverCol = gridPos.col; state.hoverRow = gridPos.row;
+
+            let closestEnt = null; let closestDist = Infinity;
+            state.entities.forEach((ent) => {
+                const dx = ent.x - worldPos.x; const dy = ent.y - worldPos.y;
+                const distSq = dx*dx + dy*dy; if(distSq < closestDist) { closestDist = distSq; closestEnt = ent; }
+            });
+            state.hoveredEntity = (closestDist < 400) ? closestEnt : null;
+            
+            coordTooltip.style.display = 'block'; coordTooltip.style.left = (pos.x + 15) + 'px'; coordTooltip.style.top = (pos.y + 15) + 'px';
+            coordTooltip.innerText = `X: ${worldPos.x.toFixed(1)}, Y: ${worldPos.y.toFixed(1)}`;
+            
+            if (state.isDrawing && (state.mode === 'tiles' || state.mode === 'elevation')) {
+                interactWithMap(pos);
+            } else {
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 1 || (e.button === 0 && e.altKey)) { state.isPanning = false; canvas.style.cursor = 'crosshair'; }
+            if (state.dragState.active) { state.dragState.active = false; state.dragState.entity = null; }
+            state.isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            state.isDrawing = false; state.isPanning = false;
+            if (state.dragState.active) { state.dragState.active = false; state.dragState.entity = null; }
+            canvas.style.cursor = 'crosshair'; coordTooltip.style.display = 'none';
+            state.hoverCol = -1; state.hoverRow = -1; render();
+        });
+        
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        function interactWithMap(pos) {
+            const gridPos = screenToGrid(pos.x, pos.y);
+            
+            if (state.mode === 'tiles') {
+                const size = state.brushSize || 1;
+                const offset = Math.floor(size / 2);
+                let updated = false;
+
+                for (let r = -offset; r < size - offset; r++) {
+                    for (let c = -offset; c < size - offset; c++) {
+                        const targetCol = gridPos.col + c;
+                        const targetRow = gridPos.row + r;
+                        if (targetCol >= 0 && targetCol < state.width && targetRow >= 0 && targetRow < state.height) {
+                            const idx = targetRow * state.width + targetCol;
+                            state.tiles[idx].type = state.currentTile;
+                            // Kullanıcı aktif olarak boyama yaptığında her zaman yeni bir flat (0-8) varyasyonu atar
+                            state.tiles[idx].v1 = Math.floor(Math.random() * 9); 
+                            updated = true;
+                        }
+                    }
+                }
+                if (updated) { updateAllFrames(); render(); }
+            } 
+            else if (state.mode === 'elevation') {
+                const size = state.brushSize || 1;
+                const offset = Math.floor(size / 2);
+                let updated = false;
+                
+                for (let r = -offset; r < size - offset; r++) {
+                    for (let c = -offset; c < size - offset; c++) {
+                        const targetCol = gridPos.col + c;
+                        const targetRow = gridPos.row + r;
+                        if (targetCol >= 0 && targetCol < state.width && targetRow >= 0 && targetRow < state.height) {
+                            const idx = targetRow * state.width + targetCol;
+                            state.tiles[idx].v2 = state.currentElev;
+                            updated = true;
+                        }
+                    }
+                }
+                if (updated) { applyCascade(); render(); }
+            }
+            else if (state.mode === 'entities' && state.isDrawing) { 
+                const worldPos = screenToWorld(pos.x, pos.y);
+                let entX, entY;
+
+                if (state.snapToGrid) {
+                    const snapPos = mathGrid(gridPos.col, gridPos.row);
+                    entX = snapPos.x;
+                    entY = snapPos.y;
+                } else {
+                    const snap = 10;
+                    entX = Math.round(worldPos.x / snap) * snap;
+                    entY = Math.round(worldPos.y / snap) * snap;
+                }
+
+                state.entities.push({
+                    type: state.currentEntity, team: state.currentTeam,
+                    x: entX, y: entY
+                });
+                state.isDrawing = false; render();
+            }
+        }
+
+        function exportData() {
+            updateSettings();
+            let out = [];
+            out.push(`localPlr:`); out.push(`${state.localPlr}`);
+            out.push(`size:`); out.push(`${state.width}`); out.push(`${state.height}`);
+            out.push(`*paths`); out.push(`data/game.chc`); out.push(`*end`);
+            
+            out.push(`*tiles`);
+            for (let r = 0; r < state.height; r++) {
+                for (let c = 0; c < state.width; c++) {
+                    const t = state.tiles[r * state.width + c];
+                    out.push(`${t.type}`); out.push(`${t.v1}`); out.push(`${t.v2}`);
+                }
+            }
+            out.push(`*end`);
+            
+            out.push(`*entitys`);
+            for (const e of state.entities) {
+                out.push(`${e.type}`); out.push(`${e.team}`);
+                out.push(`${e.x.toFixed(1)}`); out.push(`${e.y.toFixed(1)}`);
+            }
+            out.push(`*end`);
+            
+            ioTextarea.value = out.join('\n');
+        }
+
+        function importData() {
+            const raw = ioTextarea.value.trim(); if (!raw) return;
+            const lines = raw.split('\n').map(l => l.trim()).filter(l => l !== '');
+            let i = 0;
+            try {
+                if (lines[i] === 'localPlr:') { i++; state.localPlr = parseInt(lines[i]); document.getElementById('localPlr').value = state.localPlr; i++; }
+                if (lines[i] === 'size:') {
+                    i++; state.width = parseInt(lines[i]); 
+                    i++; state.height = parseInt(lines[i]); 
+                    const mapSizeInput = document.getElementById('mapSize');
+                    if (mapSizeInput) mapSizeInput.value = state.width;
+                    i++;
+                }
+                if (lines[i] === '*paths') { while (lines[i] !== '*end' && i < lines.length) i++; i++; }
+                
+                if (lines[i] === '*tiles') {
+                    i++; 
+                    let grid = 0;
+                    state.tiles = new Array(state.width * state.height);
+                    
+                    while (lines[i] !== '*end' && lines[i] !== '*entitys' && i < lines.length) {
+                        const tType = lines[i++]; 
+                        const v1 = parseInt(lines[i++]); 
+                        const v2 = parseInt(lines[i++]);
+                        
+                        if (!colors.tiles[tType]) addCustomTile(tType);
+                        
+                        const r = Math.floor(grid / state.width);
+                        const c = grid % state.width;
+                        
+                        if (r < state.height && c >= 0 && c < state.width) {
+                            state.tiles[r * state.width + c] = { type: tType, v1, v2 };
+                        }
+                        grid++;
+                    }
+                    if(lines[i] === '*end') i++;
+                }
+                
+                if (lines[i] === '*entitys') {
+                    i++; state.entities = [];
+                    while (lines[i] !== '*end' && i < lines.length) {
+                        const type = lines[i++]; const team = parseInt(lines[i++]);
+                        const x = parseFloat(lines[i++]); const y = parseFloat(lines[i++]);
+                        if (!entityShapes[type]) {
+                            // Import sırasında rastgele veya basit bir şekil ver
+                            const randomShapes = ['box', 'cylinder', 'pyramid', 'diamond'];
+                            const rShape = randomShapes[Math.floor(Math.random() * randomShapes.length)];
+                            addCustomEntity(type, rShape); 
+                        }
+                        state.entities.push({ type, team, x, y });
+                    }
+                }
+                updateAllFrames();
+                resizeMap(); render();
+                alert("Harita başarıyla yüklendi!");
+            } catch (err) {
+                console.error("Parse error", err); alert("Yükleme sırasında hata oluştu.");
+            }
+        }
+
+        function copyToClipboard() {
+            ioTextarea.select(); document.execCommand('copy'); window.getSelection().removeAllRanges();
+            const btn = document.querySelector('button[title="Kopyala"]'); btn.innerText = "Kopyalandı!"; setTimeout(() => btn.innerText = "Kopyala", 1500);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        initElevationButtons();
+        initMap();
+
+    </script>
+</body>
+</html>
