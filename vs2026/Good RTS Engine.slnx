@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Good RTS Engine/Good RTS Engine.vcxproj" Id="404c0630-dfb7-416f-a5d3-a5bbf5233027" />
+</Solution>
