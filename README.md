@@ -100,6 +100,9 @@ In the functions below, `X` represents the Lua prefix defined inside `MakeWidget
 * **`XFirstTime`**: The base function called only once when the widget is first created.
 * **`XThink`**: The main loop function, called every frame as long as the widget is open and hasn't been deleted.
 * **`XClick`**: Called whenever the widget is clicked with the mouse.
+* **`XTouch`**: Called continuously as long as the mouse cursor hovers over the widget area.
+* **`XLeave`**: Called once when the mouse cursor exits the bounds of the widget area.
+* **`XOnEvent`**: Called when a specific input event or state change occurs on the widget.
 
 ### Basic GUI Function Parameters: `(self, dt)` and `(self, click, dt)`
 * **`self`**: The core parameter representing the widget itself.
