@@ -1,0 +1,6 @@
+*paths
+data/tile/grass.chc
+data/tile/sand.chc
+data/tile/dirt.chc
+data/tile/tile.tlp
+*end

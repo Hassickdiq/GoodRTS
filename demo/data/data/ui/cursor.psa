@@ -1,0 +1,9 @@
+*paths
+textures/cursor/NORMAL.png
+*end
+fps:
+30.0
+index:
+0
+name:
+cursor

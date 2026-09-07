@@ -1,0 +1,6 @@
+*paths
+textures/unit/storeroom/storeroom_01.png
+data/storeroom/AStoreroom.psa
+data/storeroom/storeroom.ent
+scripts/storeroom.lua
+*end

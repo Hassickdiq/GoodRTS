@@ -1,0 +1,9 @@
+*paths
+textures/unit/fruit/fruit_01.png
+*end
+fps:
+30.0
+index:
+0
+name:
+AFruit
