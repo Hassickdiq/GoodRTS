@@ -1,6 +1,0 @@
-*paths
-textures/unit/wall/wall_01.png
-data/wall/AWall.psa
-data/wall/wall.ent
-scripts/wall.lua
-*end

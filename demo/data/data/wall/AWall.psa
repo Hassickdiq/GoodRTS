@@ -1,9 +1,0 @@
-*paths
-textures/unit/wall/wall_01.png
-*end
-fps:
-30.0
-index:
-0
-name:
-AWall

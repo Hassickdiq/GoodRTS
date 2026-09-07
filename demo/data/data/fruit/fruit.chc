@@ -1,6 +1,0 @@
-*paths
-textures/unit/fruit/fruit_01.png
-data/fruit/AFruit.psa
-data/fruit/fruit.ent
-scripts/fruit.lua
-*end

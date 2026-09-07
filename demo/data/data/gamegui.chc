@@ -1,7 +1,0 @@
-*paths
-data/ui/cursor.chc
-data/ui/unit.chc
-data/ui/unitOrder.chc
-scripts/gameMenu.lua
-scripts/gameGui.lua
-*end

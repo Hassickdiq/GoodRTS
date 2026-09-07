@@ -1,6 +1,0 @@
-*paths
-textures/unit/barrack/barrack_01.png
-data/barrack/ABarrack.psa
-data/barrack/barrack.ent
-scripts/barrack.lua
-*end

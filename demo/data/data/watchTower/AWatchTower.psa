@@ -1,9 +1,0 @@
-*paths
-textures/unit/watchTower/watchTower_01.png
-*end
-fps:
-30.0
-index:
-0
-name:
-AWatchTower

@@ -1,6 +1,0 @@
-*paths
-textures/unit/watchTower/watchTower_01.png
-data/watchTower/AWatchTower.psa
-data/watchTower/watchTower.ent
-scripts/watchTower.lua
-*end
