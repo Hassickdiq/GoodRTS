@@ -31,6 +31,7 @@ struct ScxTile {
     u8 elevation;  // Yükseklik seviyesi
     int8_t offx = 0;
     int8_t offy = 0;
+    bool isBlocked = false;
 };
 
 Vector2 MathGrid(int x, int y);
@@ -93,6 +94,8 @@ public:
     static int LuaPlayAnimation(lua_State* L);
     static int LuaPlaySound(lua_State* L);
     static int LuaGiveOrder(lua_State* L);
+    static int LuaGetPlayerState(lua_State* L);
     static int EntityNewIndex(lua_State* L);
     static int EntityIndex(lua_State* L);
+    static int LuaGetEntity(lua_State* L);
 };

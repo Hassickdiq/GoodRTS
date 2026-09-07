@@ -31,6 +31,8 @@ public:
 	static Game* Quit(Game* game);
 	GameWorld* LoadWorld(std::string path);
 	void InitGameMenu(lua_State* L);
+	void InitWorld(lua_State* L, u8 localPlr);
+	void CloseWorld(lua_State* L);
 	static int LuaLoadMap(lua_State* L);
 
 	void GameLoop();

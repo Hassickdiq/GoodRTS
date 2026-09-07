@@ -31,8 +31,19 @@ FlowMap::FlowMap(void* worldPtr, Vector2 targetGridPos) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int idx = y * width + x;
-            map[idx].cost = 1;
-            map[idx].direction = { 0, 0 };
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int idx = y * width + x;
+
+                    if (myWorld->map->data[idx].isBlocked) {
+                        map[idx].cost = 255;
+                    }
+                    else {
+                        map[idx].cost = 1;
+                    }
+                    map[idx].direction = { 0, 0 };
+                }
+            }
         }
     }
 
@@ -56,17 +67,11 @@ FlowMap::FlowMap(void* worldPtr, Vector2 targetGridPos) {
     int targetX = (int)targetGridPos.x;
     int targetY = (int)targetGridPos.y;
 
-    if (targetX < 0)
-        targetX = 0;
+    if (targetX < 0) targetX = 0;
+    if (targetX >= (int)width) targetX = (int)width - 1;
 
-    if (targetX >= (int)width)
-        targetX = (int)width;
-
-    if (targetY < 0)
-        targetY = 0;    
-
-    if (targetY >= (int)height)
-        targetY = (int)height;
+    if (targetY < 0) targetY = 0;
+    if (targetY >= (int)height) targetY = (int)height - 1;  
 
     int targetIdx = targetY * width + targetX;
     integrationValues[targetIdx] = 0;

@@ -360,13 +360,6 @@ void Entity::Update(void* myWorldptr, float dt) {
 		Anim2D* Anim = &graphic.Animations[graphic.nowAnimation];
 		Texture2D* tx = Anim->frames[Anim->index];
 
-		// for Collison
-		boundbox.max.x = transform.origin.x + tx->width;
-		boundbox.min.x = transform.origin.x - tx->width / 2;
-
-		boundbox.max.y = transform.origin.y + (tx->height / 2) - (16 * transform.elevation);
-		boundbox.min.y = transform.origin.y - (16 * transform.elevation);
-
 		// for Select
 		Selectbbox.max.x = transform.origin.x + tx->width / 2;
 		Selectbbox.min.x = transform.origin.x - tx->width / 2;
@@ -376,49 +369,69 @@ void Entity::Update(void* myWorldptr, float dt) {
 
 		Vector2 collTile = WorldToGrid(transform.origin);
 		u64 grid = static_cast<int>(collTile.y) * myWorld->map->width + static_cast<int>(collTile.x);
-		if (grid < myWorld->map->size){
+		if (grid < myWorld->map->size) {
 			transform.elevation = myWorld->map->data[grid].elevation;
 		}
 
 		for (int i = 0; i < ENTITY_LIMIT; i++) {
-			Entity* entB = this;
 			Entity* entA = myWorld->EntityList[i];
-				if (entA && entA != entB) {
-					if (entA->boundbox.max.x > entB->boundbox.min.x && 
-						entA->boundbox.min.x < entB->boundbox.max.x &&
-						entA->boundbox.max.y > entB->boundbox.min.y &&
-						entA->boundbox.min.y < entB->boundbox.max.y){
+			Entity* entB = this;
 
-						float distX = (entA->transform.origin.x) - entB->transform.origin.x;
-						float distY = (entA->transform.origin.y) - entB->transform.origin.y - 16 * entB->transform.elevation;
-						float radiusX = entA->transform.size;
-						float radiusY = entA->transform.size * 0.5f;
+			if (entA && entA != entB) {
 
-						float normalizedDist = (distX * distX) / (radiusX * radiusX) + (distY * distY) / (radiusY * radiusY);
+				float distX = entA->transform.origin.x - entB->transform.origin.x;
+				float distY = entA->transform.origin.y - entB->transform.origin.y;
 
-						if ((normalizedDist < 1.0f)) {
-							if (entB->states.canItTouch) {
-								TouchEntity(myWorld->L, entA);
+				float adjustedDistY = distY * 2.0f;
+
+				float distance = sqrt((distX * distX) + (adjustedDistY * adjustedDistY));
+
+				float combinedRadius = entA->transform.size + entB->transform.size;
+
+				if (distance < combinedRadius && distance > 0.0f) {
+
+					if (entB->states.canItTouch) {
+						TouchEntity(myWorld->L, entA);
+					}
+
+					float overlap = combinedRadius - distance;
+
+					float dirX = distX / distance;
+					float dirY = adjustedDistY / distance;
+
+					float pushForce = overlap * 0.5f * dt * 50.0f;
+					float pushX = dirX * pushForce;
+					float pushY = (dirY * 0.5f) * pushForce;
+
+					if (!entA->states.isAnchor && states.isCollison) {
+						Vector2 newPosA = { entA->transform.origin.x + pushX, entA->transform.origin.y + pushY };
+						Vector2 gridPosA = WorldToGrid(newPosA);
+						int gxa = (int)(gridPosA.x + 0.5f);
+						int gya = (int)(gridPosA.y + 0.5f);
+
+						if (gxa >= 0 && gxa < myWorld->map->width && gya >= 0 && gya < myWorld->map->height) {
+							if (!myWorld->map->data[gya * myWorld->map->width + gxa].isBlocked) {
+								entA->transform.origin = newPosA;
+								entA->Rendered = false;
 							}
+						}
+					}
 
-							if (states.isCollison){
-								float overlap = entA->transform.size - normalizedDist;
+					if (!entB->states.isAnchor && states.isCollison) {
+						float multiplier = (entA->states.isAnchor) ? 2.0f : 1.0f;
+						Vector2 newPosB = { entB->transform.origin.x - (pushX * multiplier), entB->transform.origin.y - (pushY * multiplier) };
+						Vector2 gridPosB = WorldToGrid(newPosB);
+						int gxb = (int)(gridPosB.x + 0.5f);
+						int gyb = (int)(gridPosB.y + 0.5f);
 
-								float pushX = (distX / normalizedDist) * (overlap * 0.5f);
-								float pushY = (distY / normalizedDist) * (overlap * 0.5f);
-
-								if (!entA->states.isAnchor) {
-									entA->transform.origin.x += pushX * dt;
-									entA->transform.origin.y += pushY * dt;
-									entA->Rendered = false;
-								}
-
-								entB->transform.origin.x -= pushX * (1 + entA->states.isAnchor * 5) * dt;
-								entB->transform.origin.y -= pushY * (1 + entA->states.isAnchor * 5) * dt;
+						if (gxb >= 0 && gxb < myWorld->map->width && gyb >= 0 && gyb < myWorld->map->height) {
+							if (!myWorld->map->data[gyb * myWorld->map->width + gxb].isBlocked) {
+								entB->transform.origin = newPosB;
 							}
 						}
 					}
 				}
+			}
 		}
 
 		Rendered = true;
@@ -459,6 +472,7 @@ void Entity::Update(void* myWorldptr, float dt) {
 		int16_t entId = nowAction.Data[0];
 
 		if (myWorld->EntityList[entId] != this && myWorld->EntityList[entId]) {
+			Entity* entB = this;
 			Entity* entA = myWorld->EntityList[entId];
 			Vector2 targetEntity = entA->transform.origin;
 			Vector2 targetgridPos = WorldToGrid(targetEntity);
@@ -471,7 +485,13 @@ void Entity::Update(void* myWorldptr, float dt) {
 
 			float normalizedDist = (distX * distX) / (radiusX * radiusX) + (distY * distY) / (radiusY * radiusY);
 
-			if (normalizedDist > 1.0f) {
+			float adjustedDistY = distY * 2.0f;
+
+			float distance = sqrt((distX * distX) + (adjustedDistY * adjustedDistY));
+
+			float combinedRadius = entA->transform.size + entB->transform.size;
+
+			if ( normalizedDist > 1.0f && !(distance < combinedRadius && distance > 0.0f)) {
 				if (!states.dontMove)
 				{
 					u64 flowId = myWorld->NewFlowMap(targetgridPos);

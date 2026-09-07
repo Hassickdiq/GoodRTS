@@ -104,33 +104,45 @@ void Player::Update(void* myWorldptr, float dt) {
 	if (gios.keyLeft)
 		cam_origin.x += cam_speed * dt;
 
-	if (gios.lastClick == 1){
+	if (gios.lastClick == 1 && !gios.ctrl){
 		int16_t entId = myWorld->EntitySelect({ gios.MousePos.x - cam_origin.x, gios.MousePos.y - cam_origin.y }, id);
 		if (entId != -1)
 			AddSelectEnt(entId, myWorldptr);
 		else
 			RstSelectEnt(myWorldptr);
+		lastAction = 0;
 	}
-	else if (gios.lastClick == 0 && (gios.ctrl) && IsMouseButtonDown(0)) {
+	else if (IsKeyPressed(KEY_LEFT_CONTROL) || IsKeyPressed(KEY_RIGHT_CONTROL)) {
+		RstSelectEnt(myWorldptr);
+		lastSelected = 0;
+	}
+	else if (IsMouseButtonPressed(0)) {
+		lastAction = 0;
+		lastSelected = 0;
+	}
+	else if (gios.lastClick == 0 && gios.ctrl && IsMouseButtonDown(0)) {
 		int16_t entId = myWorld->EntitySelect({ gios.MousePos.x - cam_origin.x, gios.MousePos.y - cam_origin.y }, id);
-		if (entId != -1){	
-			if (myWorld->EntityList[entId])
-				if (myWorld->EntityList[entId]->choseMe[id] == -1)
+		if (entId != -1){
+			if (myWorld->EntityList[entId]){	
+				if (lastSelected != entId && myWorld->EntityList[entId]->choseMe[id] == -1 && (lastAction == 0 || lastAction == 1)){
 					AddSelectEnt(entId, myWorldptr);
+					lastSelected = entId;
+					lastAction = 1;
+				}
+				else if (lastSelected != entId && myWorld->EntityList[entId]->choseMe[id] != -1 && (lastAction == 0 || lastAction == 2)){
+					SubSelectEnt(entId, myWorldptr);
+					lastSelected = entId;
+					lastAction = 2;
+				}
+			}
 		}
 	}
 	else if (gios.lastClick == 2) {
 		int16_t entId = myWorld->EntitySelect({ gios.MousePos.x - cam_origin.x, gios.MousePos.y - cam_origin.y }, id);
-
 		if (entId == -1){
 			Vector2 clickWorld = { gios.MousePos.x - cam_origin.x, gios.MousePos.y - cam_origin.y };
 			Vector2 gridPos = WorldToGrid(clickWorld);
-
-			int gridX = (int)(gridPos.x + 0.5f);
-			int gridY = (int)(gridPos.y + 0.5f);
-
-			// Akış alanını hesapla
-			int indx = myWorld->NewFlowMap({ (float)gridX, (float)gridY });
+			int indx = myWorld->NewFlowMap(gridPos);
 
 			if (indx != -1){
 				Action Move;

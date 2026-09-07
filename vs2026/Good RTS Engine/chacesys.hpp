@@ -47,6 +47,8 @@ struct TpEntity {
 	float minDamage = 0.0f;
 	bool isThere = false;
 	uint16_t eClass = 0;
+	int16_t SelectBoxOffY = 0;
+	int16_t SelectBoxOffX = 0;
 };
 
 class GameCache {

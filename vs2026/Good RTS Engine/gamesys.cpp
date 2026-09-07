@@ -27,7 +27,8 @@ Game::Game() {
 		return;
 	}
 
-	ToggleFullscreen();
+	//ToggleFullscreen();
+	SetExitKey(0);
 	SetTargetFPS(FPS_LIMIT);
 	HideCursor();
 	InitAudioDevice();
@@ -169,6 +170,7 @@ GameWorld* Game::LoadWorld(std::string path) {
 			}
 		}
 
+		InitWorld(L, newWorld->l_plr_id);
 		return newWorld;
 	}
 
@@ -186,6 +188,10 @@ void GetIO(GameIO* gios) {
 
 	u16 key = GetCharPressed();
 	gios->lastKey = key;
+
+	key = GetKeyPressed();
+	if (key)
+		gios->lastPressedKey = key;
 
 	for (int i = 0; i < 9; i++) {
 		gios->numpad[i] = IsKeyDown(48 + i);
@@ -220,13 +226,64 @@ void Game::InitGameMenu(lua_State* L) {
 	}
 }
 
+void Game::CloseWorld(lua_State* L) {
+	float dt = GetFrameTime();
+	if (dt > 0.05f) dt = 0.05f;
+
+	if (!this) return;
+
+	lua_getglobal(L, "CloseWorld");
+
+	if (lua_isfunction(L, -1)) {
+
+		if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+			std::cout << "Script Calisma Hatasi: " << lua_tostring(L, -1) << std::endl;
+			lua_pop(L, 1);
+		}
+	}
+	else {
+		lua_pop(L, 1);
+	}
+}
+
+void Game::InitWorld(lua_State* L, u8 localPlr) {
+	float dt = GetFrameTime();
+	if (dt > 0.05f) dt = 0.05f;
+
+	if (!this) return;
+
+	lua_getglobal(L, "InitWorld");
+
+	if (lua_isfunction(L, -1)) {
+
+		lua_pushinteger(L, (int)localPlr);
+
+		if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+			std::cout << "Script Calisma Hatasi: " << lua_tostring(L, -1) << std::endl;
+			lua_pop(L, 1);
+		}
+	}
+	else {
+		lua_pop(L, 1);
+	}
+}
+
 int Game::LuaLoadMap(lua_State* L) {
 	lua_getfield(L, LUA_REGISTRYINDEX, "MyGameGameInstance");
 	Game* myGame = (Game*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
 	if (lua_isstring(L, 1)) {
-		std::string path = lua_tostring(L, 1);
+		std::string path = lua_tostring(L, 1);{
+			if (myGame->world) {
+				myGame->world->Delete();
+				myGame->CloseWorld(L);
+			}
+		}
+
+		lua_gc(L, LUA_GCCOLLECT, 0);
+		lua_gc(L, LUA_GCCOLLECT, 0);
+
 		myGame->world = myGame->LoadWorld(path);
 	}
 
@@ -234,13 +291,8 @@ int Game::LuaLoadMap(lua_State* L) {
 }
 
 void Game::GameLoop() {
-	gui->Cache.Load("data/ui/cursor.chc");
+	gui->Cache.Load("data/gamegui.chc", L);
 	Anim2D cursor = gui->Cache.Animations["cursor"];
-
-	if (luaL_dofile(L, "scripts/gameMenu.lua") != LUA_OK) {
-		std::cout << "Lua load error (scripts / gameMenu.lua): " << lua_tostring(L, -1) << std::endl;
-		lua_pop(L, 1);
-	}
 
 	InitGameMenu(L);
 
@@ -268,10 +320,10 @@ void Game::GameLoop() {
 				gui->gios.focus = -1;
 		}
 
-		DrawTextureEx(*cursor.frames[cursor.index], gios.MousePos, 0.0f, 1.0f, WHITE);
+		DrawTextureEx(*cursor.frames[cursor.index], gios.MousePos, 0.0f, 0.65f, WHITE);
 
-		DrawFPS(0, 16);
-		DrawText(GetMemoryUsage().c_str(), 0, 0, 20, LIGHTGRAY);
+		//DrawFPS(0, 16);
+		//DrawText(GetMemoryUsage().c_str(), 0, 0, 20, LIGHTGRAY);
 		EndDrawing();
 	}
 

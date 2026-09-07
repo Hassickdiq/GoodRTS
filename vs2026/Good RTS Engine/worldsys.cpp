@@ -50,6 +50,10 @@ void GameWorld::PopEntity(int index) {
     if (EntityList[index]) {
         Entity* ent = EntityList[index];
         delete ent->logic.dynamic_vector;
+        ent->graphic.Animations.clear();
+        ent->graphic.Animations.shrink_to_fit();
+        ent->audio.Sounds.clear();
+        ent->audio.Sounds.shrink_to_fit();
 
         for (int p = 0; p < 9; p++) {
             if (ent->choseMe[p] != -1) {
@@ -91,6 +95,8 @@ Entity* GameWorld::MakeEntity(TpEntity* tpE, Vector2 origin, u8 player) {
         }
         a->states.isAnchor = tpE->isAnchor;
         a->transform.size = tpE->size;
+        a->graphic.SelectBoxOffX = tpE->SelectBoxOffX;
+        a->graphic.SelectBoxOffY = tpE->SelectBoxOffY;
         a->logic.luaprefix = tpE->luaPrefix;
         a->transform.origin = origin;
         a->logic.hitPoint = tpE->maxHitPoint;
@@ -167,20 +173,56 @@ int GameWorld::LuaGiveOrder(lua_State* L) {
     GameWorld* myWorld = (GameWorld*)lua_touserdata(L, -1);
     lua_pop(L, 1);
 
-    if (lua_isinteger(L, 1) && lua_isstring(L, 2)) {
+    if (lua_isinteger(L, 1) && lua_isstring(L, 2) && lua_isinteger(L, 3)) {
         int16_t entId = lua_tointeger(L, 1);
         string Order = lua_tostring(L, 2);
+        int8_t player = lua_tointeger(L, 3);
 
         if (Order == "ATTACK") {
             if (lua_isnumber(L, 3)){
                 if (myWorld->EntityList[entId]){
                     Action Attack;
                     Attack.type = ATTACK;
-                    Attack.Data[0] = lua_tointeger(L, 3);
+                    Attack.Data[0] = lua_tointeger(L, 4);
                     Attack.Target_id = myWorld->EntityList[entId]->ownerID;
                     Attack.globaltime = myWorld->globaltime;
-                    myWorld->EntityList[entId]->nowAction = Attack;
+
+                    if (player == -1)
+                        myWorld->EntityList[entId]->nowAction = Attack;
+                    else
+                        myWorld->players[player].GiveOrderEnt(Attack, myWorld);
                 }
+            }
+        }
+        else if (Order == "MOVE") {
+            if (myWorld->EntityList[entId]) {
+                Vector2 movePos = { static_cast<float>(lua_tonumber(L, 4)), static_cast<float>(lua_tonumber(L, 5)) };
+                Vector2 gridPos = WorldToGrid(movePos);
+                int indx = myWorld->NewFlowMap(gridPos);
+
+                Action Move;
+                Move.type = MOVE;
+                Move.Data[0] = movePos.x;
+                Move.Data[1] = movePos.y;
+                Move.Data[2] = indx;
+                Move.Target_id = myWorld->EntityList[entId]->ownerID;
+                Move.globaltime = myWorld->globaltime;
+
+                if (player == -1)
+                    myWorld->EntityList[entId]->nowAction = Move;
+                else
+                    myWorld->players[player].GiveOrderEnt(Move, myWorld);
+            }
+        }
+        else if (Order == "NOP") {
+            if (myWorld->EntityList[entId]) {
+                Action Nop;
+                Nop.type = NOP;
+
+                if (player == -1)
+                    myWorld->EntityList[entId]->nowAction = Nop;
+                else
+                    myWorld->players[player].GiveOrderEnt(Nop, myWorld);
             }
         }
     }
@@ -232,6 +274,85 @@ int GameWorld::LuaMakeEntity(lua_State* L) {
     return 1;
 }
 
+int GameWorld::LuaGetPlayerState(lua_State* L) {
+    lua_getfield(L, LUA_REGISTRYINDEX, "MyGameWorldInstance");
+    GameWorld* myWorld = (GameWorld*)lua_touserdata(L, -1);
+    lua_pop(L, 1);
+
+    if (lua_isinteger(L, 1) && lua_isstring(L, 2)) {
+        u8 playerId = lua_tointeger(L, 1);
+        const char* key = lua_tostring(L, 2);
+
+        if (playerId > 9) return 0;
+        Player* plr = &myWorld->players[playerId];
+
+        size_t keycode = 0;
+        if (key[0] == 0) return 0;
+
+        for (size_t i = 0; i < strlen(key); i++) {
+            keycode += ((size_t)key[i] * (i + (size_t)key[i]));
+        }
+        keycode *= (keycode & (keycode + strlen(key) / key[0]));
+
+        switch (keycode) {
+            case 15542608900: { // selectedEnt
+                lua_newtable(L);
+                int tableI = 0;
+                for (size_t i = 0; i < SELECT_LIMIT; i++) {
+                    if (plr->SelectedEnt[i] != -1){
+                        lua_pushinteger(L, (int)plr->SelectedEnt[i]);
+                        lua_rawseti(L, -2, tableI);
+                        tableI++;
+                    }
+                }
+                if (!tableI) {
+                    lua_pushinteger(L, -1);
+                    lua_rawseti(L, -2, 0);
+                }
+                return 1;
+            }
+            default: {
+                cout << "Unknown key | " << key << ": " << keycode << endl;
+                break;
+            }
+        }
+        return 0;
+    }
+    return 0;
+}
+
+int GameWorld::LuaGetEntity(lua_State* L) {
+    lua_getfield(L, LUA_REGISTRYINDEX, "MyGameWorldInstance");
+    GameWorld* myWorld = (GameWorld*)lua_touserdata(L, -1);
+    lua_pop(L, 1);
+
+    int16_t id = -1;
+    if (lua_isinteger(L, 1))
+        id = lua_tointeger(L, 1);
+    else {
+        cout << "Missing argument for \"GetEntity\"" << endl;
+        return 0;
+    }
+
+    Entity* ent = myWorld->EntityList[id];
+
+    if (ent) {
+        lua_newtable(L);
+        lua_pushinteger(L, ent->id);
+        lua_setfield(L, -2, "id");
+        luaL_getmetatable(L, "EntityMeta");
+        lua_setmetatable(L, -2);
+        return 1;
+    }
+
+    lua_newtable(L);
+    lua_pushinteger(L, id);
+    lua_setfield(L, -2, "id");
+    luaL_getmetatable(L, "EntityMeta");
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
 int GameWorld::EntityIndex(lua_State* L) {
     luaL_getmetatable(L, "EntityMeta");
     lua_getfield(L, -1, "__world");
@@ -280,6 +401,10 @@ int GameWorld::EntityIndex(lua_State* L) {
 
         switch (keycode)
         {
+        case 6036513025: { // isThere
+            lua_pushboolean(L, true);
+            return 1;
+        }
         case 51872795536: { // transform_origin_x
             lua_pushnumber(L, static_cast<float>(EntityList[id]->transform.origin.x));
             return 1;
@@ -288,7 +413,7 @@ int GameWorld::EntityIndex(lua_State* L) {
             lua_pushnumber(L, static_cast<float>(EntityList[id]->transform.origin.y));
             return 1;
         }
-        case 57142990116: { // trasnform_direction
+        case 57142990116: { // transform_direction
             lua_pushinteger(L, static_cast<int>(EntityList[id]->transform.currentDirection));
             return 1;
         }
@@ -312,12 +437,16 @@ int GameWorld::EntityIndex(lua_State* L) {
             lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.hitPoint));
             return 1;
         }
+        case 39700961001: { // logic_maxHitPoint
+            lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.maxHitPoint));
+            return 1;
+        }
         case 27573930916: { // logic_minDamage
-            lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.minDamage));
+            lua_pushinteger(L, static_cast<int>(EntityList[id]->logic.minDamage));
             return 1;
         }
         case 27809564644: { // logic_maxDamage
-            lua_pushnumber(L, static_cast<float>(EntityList[id]->logic.maxDamage));
+            lua_pushinteger(L, static_cast<int>(EntityList[id]->logic.maxDamage));
             return 1;
         }
         case 30060971161: { // logic_moveSpeed
@@ -369,7 +498,8 @@ int GameWorld::EntityIndex(lua_State* L) {
             break;
         }
     }
-    return 0;
+    lua_pushboolean(L, false);
+    return 1;
 }
 
 int GameWorld::EntityNewIndex(lua_State* L) {
@@ -512,6 +642,9 @@ GameWorld::GameWorld(u32 mapW, u32 mapH, u8 plr_id, lua_State* mainL) {
         }
     }
 
+    for (size_t i = 0; i < 9; i++)
+        players[i].RstSelectEnt(this);
+
     L = mainL;
     l_plr_id = plr_id;
     luaL_newmetatable(L, "EntityMeta");
@@ -540,26 +673,52 @@ GameWorld::GameWorld(u32 mapW, u32 mapH, u8 plr_id, lua_State* mainL) {
     lua_pushcfunction(L, GameWorld::LuaGiveOrder);
     lua_setglobal(L, "GiveOrder");
 
+    lua_pushcfunction(L, GameWorld::LuaGetPlayerState);
+    lua_setglobal(L, "GetPlayerState");
+
+    lua_pushcfunction(L, GameWorld::LuaGetEntity);
+    lua_setglobal(L, "GetEntity");
+
     ResetEntityVector();
 }
 
-void GameWorld::Delete(){
+void GameWorld::Delete() {
+    for (auto& pair : FlowMaps) {
+        if (pair.second) {
+            delete[] pair.second->map;
+            delete pair.second;
+        }
+    }
+    std::unordered_map<u64, FlowMap*>().swap(FlowMaps);
+    std::vector<u64>().swap(FlowMapStack);
+
     if (map) {
         delete map;
         map = nullptr;
     }
-    if (L != nullptr) {
-        lua_close(L);
-        L = nullptr;
-    }
+
     for (int i = 0; i < ENTITY_LIMIT; i++) {
         if (EntityList[i]) {
+            EntityList[i]->graphic.Animations.clear();
+            EntityList[i]->graphic.Animations.shrink_to_fit();
+            EntityList[i]->audio.Sounds.clear();
+            EntityList[i]->audio.Sounds.shrink_to_fit();
+
             delete EntityList[i]->logic.dynamic_vector;
             delete EntityList[i];
             EntityList[i] = nullptr;
         }
     }
+
     Cache.UnloadAll();
+
+    if (L) {
+        lua_pushnil(L);
+        lua_setfield(L, LUA_REGISTRYINDEX, "MyGameWorldInstance");
+        lua_settop(L, 0);
+    }
+
+    L = nullptr;
 }
 
 u64 GameWorld::NewFlowMap(Vector2 targetGridPos) {
@@ -640,14 +799,58 @@ int GameWorld::Render() {
             {
                 float maxHitPoint = static_cast<float>(ent->logic.maxHitPoint);
                 float hitPoint = static_cast<float>(ent->logic.hitPoint);
-                Vector2 hpBarOrigin = { ent->transform.origin.x + cam.x - 20,  ent->transform.origin.y + -16 * ent->transform.elevation + cam.y - tx.height };
 
-                if (IsKeyDown('A')) {
-                    DrawEllipseLines(ent->transform.origin.x + cam.x, ent->transform.origin.y + -16 * ent->transform.elevation + cam.y + (tx.height / 2.0f) - 5, ent->logic.attackRadius, ent->logic.attackRadius / 2, RED);
-                    DrawEllipseLines(ent->transform.origin.x + cam.x, ent->transform.origin.y + -16 * ent->transform.elevation + cam.y + (tx.height / 2.0f) - 5, ent->logic.fowRadius, ent->logic.fowRadius / 2, DARKBLUE);
+                float elevOffset = -16 * ent->transform.elevation;
+                float originX = ent->transform.origin.x + cam.x + ent->graphic.SelectBoxOffX;
+                float originY = ent->transform.origin.y + cam.y + ent->graphic.SelectBoxOffY + elevOffset;
+
+                Vector2 hpBarOrigin = { originX - 20, originY - tx.height };
+
+                if (ent->states.isAnchor) {
+                    float w = ent->transform.size * 1.2f;
+                    float h = w / 2.0f;
+
+                    Vector2 p1 = { originX, originY - h }; // Üst
+                    Vector2 p2 = { originX + w, originY }; // Sağ
+                    Vector2 p3 = { originX, originY + h }; // Alt
+                    Vector2 p4 = { originX - w, originY }; // Sol
+
+                    DrawLineEx(p1, p2, 1.5f, WHITE);
+                    DrawLineEx(p2, p3, 1.5f, WHITE);
+                    DrawLineEx(p3, p4, 1.5f, WHITE);
+                    DrawLineEx(p4, p1, 1.5f, WHITE);
+                }
+                else {
+                    float visualRadius = ent->transform.size;
+                    float visualAttackRadius = ent->logic.attackRadius;
+                    float visualFowRadius = ent->logic.fowRadius;
+
+                    if (IsKeyDown('A')) {
+                        DrawEllipseLines(
+                            originX,
+                            originY,
+                            visualFowRadius,
+                            visualFowRadius / 2,
+                            DARKBLUE
+                        );
+                        DrawEllipseLines(
+                            originX,
+                            originY,
+                            visualAttackRadius,
+                            visualAttackRadius / 2,
+                            RED
+                        );
+                    }
+
+                    DrawEllipseLines(
+                        originX,
+                        originY,
+                        visualRadius,
+                        visualRadius / 2.0f,
+                        WHITE
+                    );
                 }
 
-                DrawEllipseLines(ent->transform.origin.x + cam.x, ent->transform.origin.y + cam.y + 10 + (-16 * ent->transform.elevation), ent->transform.size, ent->transform.size / 2, WHITE);
                 DrawRectangleV(hpBarOrigin, { 40, 5 }, BLACK);
                 hpBarOrigin.x += 1;
                 hpBarOrigin.y += 1;
@@ -685,15 +888,10 @@ int GameWorld::Render() {
                 DrawTexturePro(tx, sourceRec, destRec, origin, 0.0f, YELLOW);
             else if (ent->ownerID == 7)
                 DrawTexturePro(tx, sourceRec, destRec, origin, 0.0f, ORANGE);
-            else if (ent->ownerID == 9)
-                DrawTexturePro(tx, sourceRec, destRec, origin, 0.0f, GRAY);
-            else if (ent->ownerID == 7)
+            else if (ent->ownerID == 8)
                 DrawTexturePro(tx, sourceRec, destRec, origin, 0.0f, PINK);
             else
                 DrawTexturePro(tx, sourceRec, destRec, origin, 0.0f, WHITE);
-
-            if (E_DEBUG)
-                DrawCircleLines(ent->transform.origin.x + cam.x, ent->transform.origin.y + -16 * ent->transform.elevation + cam.y + tx.height / 2.0f, ent->transform.size, RED);
         }
     }
 

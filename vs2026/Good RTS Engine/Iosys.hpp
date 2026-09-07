@@ -20,6 +20,7 @@ struct GameIO {
 	Vector2 MousePos = {0, 0};
 	u16 lastKey = 0x00;
 	u8 lastClick = 0x00;
+	u16 lastPressedKey = 0x00;
 
 	int16_t focus = -1;
 

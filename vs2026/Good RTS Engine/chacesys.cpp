@@ -20,20 +20,34 @@ void GameCache::UnloadAll() {
     for (auto& pair : Textures) {
         UnloadTexture(pair.second);
     }
-    Textures.clear();
+
+    std::unordered_map<std::string, Texture2D>().swap(Textures);
 
     for (auto& pair : Sounds) {
         UnloadSound(pair.second);
     }
-    Sounds.clear();
+    std::unordered_map<std::string, Sound>().swap(Sounds);
 
     for (auto& pair : Animations) {
         pair.second.frames.clear();
+        pair.second.frames.shrink_to_fit();
     }
-    Animations.clear();
+    std::unordered_map<std::string, Anim2D>().swap(Animations);
 
-    TpTiles.clear();
-    TpEntitys.clear();
+    for (auto& pair : TpEntitys) {
+        pair.second.animPath.clear();
+        pair.second.animPath.shrink_to_fit();
+        pair.second.soundPath.clear();
+        pair.second.soundPath.shrink_to_fit();
+    }
+    std::unordered_map<std::string, TpEntity>().swap(TpEntitys);
+
+    for (auto& pair : TpTiles) {
+        pair.second.animPath.clear();
+    }
+    std::unordered_map<std::string, TpTile>().swap(TpTiles);
+
+    std::unordered_map<std::string, bool>().swap(Files);
 }
 
 void GameCache::Load(std::string path, lua_State* L) {
@@ -101,6 +115,7 @@ vector<string> FileToLineBuffer(string name) {
         buffer.push_back(line);
     }
 
+    file.close();
     return buffer;
 }
 
@@ -211,6 +226,18 @@ void GameCache::ENTInterpreter(std::string path) {
     if (!value.empty())
         try { newTpEntity.size = stof(value); }
         catch (const std::invalid_argument& e) { cout << "This is not a number." << endl; error = true; }
+    else return;
+
+    value = GetValue("SelectBoxOffX:", buffer_ptr, &i);
+    if (!value.empty())
+        try { newTpEntity.SelectBoxOffX = stoi(value); }
+    catch (const std::invalid_argument& e) { cout << "This is not a number." << endl; error = true; }
+    else return;
+
+    value = GetValue("SelectBoxOffY:", buffer_ptr, &i);
+    if (!value.empty())
+        try { newTpEntity.SelectBoxOffY = stoi(value); }
+    catch (const std::invalid_argument& e) { cout << "This is not a number." << endl; error = true; }
     else return;
 
     value = GetValue("isAnchor:", buffer_ptr, &i);

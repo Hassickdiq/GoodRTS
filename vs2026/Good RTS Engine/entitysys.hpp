@@ -50,6 +50,8 @@ struct eLogic{
 struct eGraphic{
 	std::vector<Anim2D> Animations;
 	int16_t nowAnimation = 0;
+	int16_t SelectBoxOffY = 0;
+	int16_t SelectBoxOffX = 0;
 };
 
 struct eAudio {

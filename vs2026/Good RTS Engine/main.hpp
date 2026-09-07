@@ -15,7 +15,7 @@
 #pragma once
 #define SCREEN_HEIGHT 720
 #define SCREEN_WIDTH 1280
-#define FPS_LIMIT 170
+#define FPS_LIMIT 0
 #define TILE_WIDTH 64
 #define TILE_HEIGHT 32
 #define ENTITY_LIMIT 2048

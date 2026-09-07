@@ -127,7 +127,7 @@ int GameGUI::LuaMakeWidget(lua_State* L) {
 			lua_pushinteger(L, BasicWidget->id);
 			return 1;
 		}
-		if (form == "BUTTON" && lua_isinteger(L, 7))
+		else if (form == "BUTTON" && lua_isinteger(L, 7))
 		{
 			int16_t owner = lua_tointeger(L, 7);
 			Widget* BasicWidget = myGUI->MakeWidget(BUTTON, origin, scale, luaprefix);
@@ -137,7 +137,17 @@ int GameGUI::LuaMakeWidget(lua_State* L) {
 			lua_pushinteger(L, BasicWidget->id);
 			return 1;
 		}
-		if (form == "SLIDER" && lua_isinteger(L, 7))
+		else if (form == "TEXT" && lua_isinteger(L, 7))
+		{
+			int16_t owner = lua_tointeger(L, 7);
+			Widget* BasicWidget = myGUI->MakeWidget(TEXT, origin, scale, luaprefix);
+			BasicWidget->logic.owner = owner;
+
+			myGUI->PushWidget(BasicWidget);
+			lua_pushinteger(L, BasicWidget->id);
+			return 1;
+		}
+		else if (form == "SLIDER" && lua_isinteger(L, 7))
 		{
 			int16_t owner = lua_tointeger(L, 7);
 			Widget* BasicWidget = myGUI->MakeWidget(SLIDER, origin, scale, luaprefix);
@@ -147,7 +157,7 @@ int GameGUI::LuaMakeWidget(lua_State* L) {
 			lua_pushinteger(L, BasicWidget->id);
 			return 1;
 		}
-		if (form == "TEXTBOX" && lua_isinteger(L, 7))
+		else if (form == "TEXTBOX" && lua_isinteger(L, 7))
 		{
 			int16_t owner = lua_tointeger(L, 7);
 			Widget* BasicWidget = myGUI->MakeWidget(TEXTBOX, origin, scale, luaprefix);
@@ -157,7 +167,7 @@ int GameGUI::LuaMakeWidget(lua_State* L) {
 			lua_pushinteger(L, BasicWidget->id);
 			return 1;
 		}
-		if (form == "LIST" && lua_isinteger(L, 7))
+		else if (form == "LIST" && lua_isinteger(L, 7))
 		{
 			int16_t owner = lua_tointeger(L, 7);
 			Widget* BasicWidget = myGUI->MakeWidget(LIST, origin, scale, luaprefix);
@@ -168,7 +178,7 @@ int GameGUI::LuaMakeWidget(lua_State* L) {
 			lua_pushinteger(L, BasicWidget->id);
 			return 1;
 		}
-		if (form == "CHECKBOX" && lua_isinteger(L, 7))
+		else if (form == "CHECKBOX" && lua_isinteger(L, 7))
 		{
 			int16_t owner = lua_tointeger(L, 7);
 			Widget* BasicWidget = myGUI->MakeWidget(CHECKBOX, origin, scale, luaprefix);
@@ -301,6 +311,7 @@ void GameGUI::Render(std::vector<int>* Order, bool transmission) {
 			Vector2 scale			= widget->transform.scale;
 			int size				= widget->transform.size;
 			std::vector<size_t>* dv = widget->logic.dynamic_vector;
+			Anim2D images			= widget->visual.animation;
 
 			Vector2 o_origin = { 0, 0 };
 
@@ -318,8 +329,7 @@ void GameGUI::Render(std::vector<int>* Order, bool transmission) {
 				break;
 			}
 			case TEXT: {
-				const char* text = widget->visual.string.c_str();
-				DrawText(text, origin.x, origin.y, scale.x * size, color);
+				DrawText(widget->visual.string.c_str(), origin.x + o_origin.x, origin.y + o_origin.y, widget->visual.str_size, color);
 				break;
 			}
 			case WINDOW: {
@@ -359,12 +369,38 @@ void GameGUI::Render(std::vector<int>* Order, bool transmission) {
 				DrawRectangle((origin.x + o_origin.x + scale.x - 2), origin.y + o_origin.y, 2, scale.y, { 0, 0, 0, 128 });
 				DrawRectangle(origin.x + o_origin.x, (origin.y + o_origin.y + scale.y - 2), scale.x, 2, { 0, 0, 0, 128 });
 
+				if (widget->visual.viewImage)
+					if (images.frames[images.index])
+						DrawTextureEx(
+							*images.frames[images.index],
+							{ origin.x + o_origin.x + widget->visual.imageOffset.x,
+							origin.y + o_origin.y + widget->visual.imageOffset.y },
+							0.0f,
+							widget->visual.imageSize,
+							widget->visual.imageColor
+						);
+
 				int fSize = widget->visual.str_size;
 				int sSize = widget->visual.string.size();
 
 				if (sSize > 0){	
 					int TxtSizeX = sSize * fSize;
-					DrawText(widget->visual.string.c_str(), origin.x + o_origin.x + (scale.x / 2) - TxtSizeX/4, origin.y + o_origin.y + (scale.y / 4), widget->visual.str_size, WHITE);
+					if (widget->visual.aligType == 0)
+						DrawText(
+							widget->visual.string.c_str(),
+							origin.x + o_origin.x + (scale.x / 2) - TxtSizeX/4 + widget->visual.strOffset.x,
+							origin.y + o_origin.y + (scale.y / 4) + widget->visual.strOffset.y,
+							fSize,
+							WHITE
+						);
+					else if (widget->visual.aligType == 1)
+						DrawText(
+							widget->visual.string.c_str(),
+							origin.x + o_origin.x + widget->visual.strOffset.x,
+							origin.y + o_origin.y + widget->visual.strOffset.y,
+							fSize,
+							WHITE
+						);
 				}
 				break;
 			}
@@ -494,7 +530,11 @@ int GameGUI::WidgetIndex(lua_State* L) {
 
 		switch (keycode)
 		{
-		case 446265625: { // id
+		case 6036513025: { // isThere
+			lua_pushboolean(L, true);
+			return 1;
+		}
+		case 446265625: {  // id
 			lua_pushinteger(L, id);
 			return 1;
 		}
@@ -549,8 +589,24 @@ int GameGUI::WidgetIndex(lua_State* L) {
 			lua_pushstring(L, widget->visual.string.c_str());
 			return 1;
 		}
+		case 36472978441: {
+			lua_pushboolean(L, widget->visual.viewImage);
+			return 1;
+		}
+		case 47317995729: { // visual_str_values
+			lua_pushinteger(L, (int)widget->visual.str_size);
+			return 1;
+		}
+		case 32420883364: { // visual_aligType
+			lua_pushinteger(L, (int)widget->visual.aligType);
+			return 1;
+		}
 		case 65137758841: { // loigc_strvalues_pop
 			lua_pushinteger(L, widget->logic.str_values->size());
+			return 1;
+		}
+		case 29232450625: { // logic_nexttime
+			lua_pushnumber(L, widget->logic.nexttime);
 			return 1;
 		}
 		default:
@@ -558,7 +614,8 @@ int GameGUI::WidgetIndex(lua_State* L) {
 			break;
 		}
 	}
-	return 0;
+	lua_pushboolean(L, false);
+	return 1;
 }
 
 int GameGUI::WidgetNewIndex(lua_State* L) {
@@ -622,19 +679,19 @@ int GameGUI::WidgetNewIndex(lua_State* L) {
 			return 0;
 		}
 		case 44059269409: { // transform_scale_x
-			widget->transform.scale.x = (int)lua_tointeger(L, 3);
+			widget->transform.scale.x = static_cast<float>(lua_tonumber(L, 3));
 			return 0;
 		}
 		case 44167225600: { // transform_scale_y
-			widget->transform.scale.y = (int)lua_tointeger(L, 3);
+			widget->transform.scale.y = static_cast<float>(lua_tonumber(L, 3));
 			return 0;
 		}
 		case 31339266841: { // transform_size
-			widget->transform.size = (int)lua_tointeger(L, 3);
+			widget->transform.size = (int16_t)lua_tonumber(L, 3);
 			return 0;
 		}
 		case 33426443241: { // transform_angle
-			widget->transform.angle = (float)lua_tonumber(L, 3);
+			widget->transform.angle = static_cast<float>(lua_tonumber(L, 3));
 			return 0;
 		}
 		case 21952867225: { // visual_color
@@ -673,8 +730,79 @@ int GameGUI::WidgetNewIndex(lua_State* L) {
 			}
 			return 0;
 		}
+		case 39003485049: { // visual_animation
+			if (lua_tostring(L, 3)) {
+				widget->visual.animation = myWorld->Cache.Animations[lua_tostring(L, 3)];
+			}
+			return 0;
+		}
+		case 36412654041: { // visual_animIndex
+			widget->visual.animation.index = (int16_t)lua_tointeger(L, 3);
+			return 0;
+		}
+		case 36472978441: { // visual_viewImage
+			widget->visual.viewImage = lua_toboolean(L, 3);
+			return 0;
+		}
+		case 36280344676: { // visual_imageSize
+			widget->visual.imageSize = static_cast<float>(lua_tonumber(L, 3));
+			return 0;
+		}
+		case 33017070436: { // visual_imageOffX
+			widget->visual.imageOffset.x = static_cast<float>(lua_tonumber(L, 3));
+			return 0;
+		}
+		case 33086882404: { // visual_imageOffY
+			widget->visual.imageOffset.y = static_cast<float>(lua_tonumber(L, 3));
+			return 0;
+		}
+		case 27441247716: { // visual_strOffX
+			widget->visual.strOffset.x = static_cast<float>(lua_tonumber(L, 3));
+			return 0;
+		}
+		case 27504232336: { // visual_strOffY
+			widget->visual.strOffset.y = static_cast<float>(lua_tonumber(L, 3));
+			return 0;
+		}
+		case 41180584900: { // visual_imageColor
+			int r, g, b, a;
+
+			lua_rawgeti(L, -1, 1);
+			r = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, -1, 2);
+			g = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, -1, 3);
+			b = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, -1, 4);
+			a = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			widget->visual.imageColor.r = (r & 0xFF);
+			widget->visual.imageColor.g = (g & 0xFF);
+			widget->visual.imageColor.b = (b & 0xFF);
+			widget->visual.imageColor.a = (a & 0xFF);
+			return 0;
+		}
+		case 36640085056: { // visual_str_size
+			widget->visual.str_size = (u8)lua_tointeger(L, 3);
+			return 0;
+		}
+		case 32420883364: { // visual_aligType
+			widget->visual.aligType = (u8)lua_tointeger(L, 3);
+			return 0;
+		}
 		case 65663550001: { // logic_strvalues_push
 			widget->logic.str_values->push_back(lua_tostring(L, 3));
+			return 0;
+		}
+		case 29232450625: { // logic_nexttime
+			widget->logic.nexttime = lua_tonumber(L, 3);
 			return 0;
 		}
 		case 58202527504: { // logic_strvalues_pop

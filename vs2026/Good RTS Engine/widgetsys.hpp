@@ -21,6 +21,7 @@ enum wForm {
 	RECTANGLE,
 	CIRCLE,
 	TEXT,
+	IMAGE,
 	WINDOW,
 	BUTTON,
 	TEXTBOX,
@@ -47,8 +48,15 @@ struct wVisual
 {
 	Anim2D animation;
 	Color color = WHITE;
+	Color imageColor = WHITE;
+	Color strColor = WHITE;
 	std::string string = "";
 	u8 str_size = 12;
+	Vector2 imageOffset;
+	Vector2 strOffset;
+	float imageSize = 1.0f;
+	bool viewImage = false;
+	u8 aligType = 0;
 };
 
 struct wAuido

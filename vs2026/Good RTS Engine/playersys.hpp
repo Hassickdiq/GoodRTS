@@ -20,23 +20,20 @@
 
 enum class DiplomacyState { Ally, Neutral, Enemy };
 
-struct PlayerResources {
-    u16 current_pop = 0;
-    u16 max_pop = 20;
-};
 
 class Player {
 public:
     u8 id;
     const char* name;
-    u8 color_id;
-    u8 civilization_id;
     Vector2 cam_origin;
+    int16_t lastSelected = -1;
+    u8 lastAction = 0;
+    u16 current_pop = 0;
+    u16 max_pop = 20;
 
     u8 selectCounter = 0;
     int16_t SelectedEnt[SELECT_LIMIT];
     GameIO gios;
-    PlayerResources resources;
     DiplomacyState diplomacy[8];
     std::vector<u8> visible_tiles;
 

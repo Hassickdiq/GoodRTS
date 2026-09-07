@@ -314,6 +314,23 @@ void Widget::Update(void* myGUIptr, int16_t orderIndex, bool transmission, doubl
 		return;
 	}
 
+	if (logic.form == TEXT) {
+		if (states.is_firsttime) {
+			states.is_firsttime = false;
+			FirstTime(L, id, dt);
+
+			if (WidgetList[logic.owner])
+				WidgetList[logic.owner]->logic.order_list->push_back(id);
+		}
+
+		if (logic.nexttime < globaltime) {
+			logic.nexttime = globaltime + 0.01;
+			if (!states.dont_think)
+				Think(L, id, globaltime, dt);
+		}
+		return;
+	}
+
 	if (logic.form == LIST) {
 		if (states.is_firsttime) {
 			states.is_firsttime = false;
