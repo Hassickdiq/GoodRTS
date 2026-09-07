@@ -1,0 +1,6 @@
+*paths
+textures/unit/granary/granary_01.png
+data/granary/AGranary.psa
+data/granary/granary.ent
+scripts/granary.lua
+*end

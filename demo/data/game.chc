@@ -1,0 +1,15 @@
+*paths
+data/ballista/ballista.chc
+data/legion/legion.chc
+data/archerRider/archerRider.chc
+data/wall/wall.chc
+data/watchTower/watchTower.chc
+data/barrack/barrack.chc
+data/human/human.chc
+data/tree/tree.chc
+data/fruit/fruit.chc
+data/storeroom/storeroom.chc
+data/granary/granary.chc
+data/tile/tile.chc
+scripts/gameGui.lua
+*end
